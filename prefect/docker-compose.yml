@@ -70,7 +70,7 @@ services:
         condition: service_healthy
     volumes:
       - ./dag:/opt/prefect/dag
-    working_dir: /opt/prefect/dag
+    working_dir: /opt/prefect
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
       PYTHONPATH: /opt/prefect/dag
