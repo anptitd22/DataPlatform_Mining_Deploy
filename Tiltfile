@@ -1,6 +1,6 @@
 local_resource(
     'init-env',
-    'cd ./lakehouse && cp .env.example .env',
+    'cd ./lakehouse && cp .env.example .env && cd .. && cd ./prefect && cp .env.example .env',
     labels=['setup']
 )
 
@@ -16,7 +16,16 @@ dc_resource('spark-master', labels=['engine'])
 dc_resource('spark-worker', labels=['engine'])
 dc_resource('spark-history-server', labels=['engine'])
 dc_resource('trino', labels=['engine'])
-dc_resource('postgres-metastore', labels=['database'])
+dc_resource('postgres-metastore', labels=['metastore-database'])
 dc_resource('metastore', labels=['metadata'])
 dc_resource('spark-common', labels=['others'])
 dc_resource('jupyter-spark', labels=['query'])
+
+docker_compose('./prefect/docker-compose.yml')
+watch_file('./prefect')
+
+dc_resource('prefect-server', labels=['orchestrator'])
+dc_resource('prefect-services', labels=['orchestrator'])
+dc_resource('prefect-worker', labels=['orchestrator'])
+dc_resource('postgres', labels=['prefect-database'])
+dc_resource('redis', labels=['prefect-database'])
