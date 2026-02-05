@@ -29,3 +29,11 @@ dc_resource('prefect-services', labels=['orchestrator'])
 dc_resource('prefect-worker', labels=['orchestrator'])
 dc_resource('postgres', labels=['prefect-database'])
 dc_resource('redis', labels=['prefect-database'])
+
+local_resource(
+  'deploy-prefect-flows',
+  'cd ./prefect && prefect deploy --all',
+  auto_init=True,
+  labels=["script"],
+  deps=['./prefect/prefect.yaml']
+)

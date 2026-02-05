@@ -70,13 +70,17 @@ services:
         condition: service_healthy
     volumes:
       - ./dag:/opt/prefect/dag
-    working_dir: /opt/prefect/dag
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
-      PYTHONPATH: /opt/prefect/dag
+      PYTHONPATH: /opt/prefect
     command: prefect worker start --pool local-pool
     restart: on-failure
 
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  default:
+    external: false
+    name: ecosystem_network_test

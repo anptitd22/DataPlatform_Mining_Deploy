@@ -155,5 +155,8 @@ volumes:
   postgres-metastore-volume:
   spark-query:
     
-
+networks:
+  default:
+    external: false
+    name: ecosystem_network_test
   
