@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, dev]
-  pull_request:
     branches: [main]
+  # pull_request:
+  #   branches: [main]
 
 jobs:
   validate:
@@ -21,7 +21,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
 
       - name: Setup Docker
         uses: docker/setup-buildx-action@v2
@@ -29,5 +29,11 @@ jobs:
       - name: Start Lakehouse
         run: |
           cd lakehouse
+          chmod +x ./start.sh
+          ./start.sh
+
+      - name: Start Orchestrator
+        run: |
+          cd prefect
           chmod +x ./start.sh
           ./start.sh
