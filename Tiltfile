@@ -35,5 +35,6 @@ local_resource(
   'cd ./prefect && prefect config set PREFECT_API_URL="http://127.0.0.1:4200/api" && prefect deploy --all',
   auto_init=True,
   labels=["script"],
-  deps=['./prefect/prefect.yaml']
+  deps=['./prefect/prefect.yaml'],
+  resource_deps=['prefect-worker', 'prefect-services', 'prefect-server', 'postgres', 'redis']
 )
