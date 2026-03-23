@@ -12,8 +12,12 @@
         <name>javax.jdo.option.ConnectionPassword</name>
     </property>
     <property>
-        <name>metastore.warehouse.dir</name>
-        <value>hdfs://namenode:8020/lakehouse</value>
+        <name>fs.s3a.endpoint</name>
+        <value>http://minio:9000</value>
+    </property>
+    <property>
+        <name>fs.s3a.path.style.access</name>
+        <value>true</value>
     </property>
 
     <property>
