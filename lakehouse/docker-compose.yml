@@ -1,41 +1,50 @@
+x-spark-common: &spark-common
+  build: ./config/spark
+  env_file:
+    - .env
+  environment: &spark-env
+    AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:-admin}
+    AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY:-admin12345}
+    AWS_REGION: us-east-1
+    AWS_DEFAULT_REGION: us-east-1
+  volumes:
+    - ./config/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    - spark-logs:/opt/spark/spark-events
+
 services:
   # Hadoop Services
-  namenode:
-    image: apache/hadoop:3.4
-    hostname: namenode
-    command: ["hdfs", "namenode"]
-    ports:
-      - 9870:9870
-    env_file:
-      - config/hadoop/hadoop-defaults.conf
-    environment:
-      ENSURE_NAMENODE_DIR: "/tmp/hadoop-hadoop/dfs/name"
-  datanode:
-    image: apache/hadoop:3.4
-    command: ["hdfs", "datanode"]
-    env_file:
-      - config/hadoop/hadoop-defaults.conf
-  resourcemanager:
-    image: apache/hadoop:3.4
-    hostname: resourcemanager
-    command: ["yarn", "resourcemanager"]
-    ports:
-        - 8088:8088
-    env_file:
-      - config/hadoop/hadoop-defaults.conf
-    volumes:
-      - ./test/hadoop/test.sh:/opt/test.sh
-  nodemanager:
-    image: apache/hadoop:3.4
-    command: ["yarn", "nodemanager"]
-    env_file:
-      - config/hadoop/hadoop-defaults.conf
+  # namenode:
+  #   image: apache/hadoop:3.4
+  #   hostname: namenode
+  #   command: ["hdfs", "namenode"]
+  #   ports:
+  #     - 9870:9870
+  #   env_file:
+  #     - config/hadoop/hadoop-defaults.conf
+  #   environment:
+  #     ENSURE_NAMENODE_DIR: "/tmp/hadoop-hadoop/dfs/name"
+  # datanode:
+  #   image: apache/hadoop:3.4
+  #   command: ["hdfs", "datanode"]
+  #   env_file:
+  #     - config/hadoop/hadoop-defaults.conf
+  # resourcemanager:
+  #   image: apache/hadoop:3.4
+  #   hostname: resourcemanager
+  #   command: ["yarn", "resourcemanager"]
+  #   ports:
+  #       - 8088:8088
+  #   env_file:
+  #     - config/hadoop/hadoop-defaults.conf
+  #   volumes:
+  #     - ./test/hadoop/test.sh:/opt/test.sh
+  # nodemanager:
+  #   image: apache/hadoop:3.4
+  #   command: ["yarn", "nodemanager"]
+  #   env_file:
+  #     - config/hadoop/hadoop-defaults.conf
+
   # Spark Services
-  spark-common: &spark-common
-    build: ./config/spark
-    volumes:
-      - ./config/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
-      - spark-logs:/opt/spark/spark-events
   spark-master:
     <<: *spark-common
     environment:
@@ -75,6 +84,7 @@ services:
       - spark-master
     ports:
       - "8082:8082"
+
   # Trino Service
   trino:
     image: trinodb/trino:463   # JDK17
@@ -91,7 +101,7 @@ services:
       - trino-data:/data/trino:rw
       # - ./config/trino/hadoop:/etc/hadoop/conf:ro
     depends_on:
-      - nodemanager
+      - minio
       - metastore
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
@@ -99,6 +109,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
   # Hive Metastore Service
   postgres-metastore:
     image: postgres:13
@@ -127,19 +138,20 @@ services:
       METASTORE_DB_TYPE: postgres
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-admin}
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-admin12345}
-      SERVICE_OPTS: >-
+      SERVICE_OPTS: >- #-Dmetastore.warehouse.dir=hdfs://namenode:8020/lakehouse
         -Xmx1G
         -Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver
         -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://postgres-metastore:5432/${HIVE_POSTGRES_DB:-metastore_db}
         -Djavax.jdo.option.ConnectionUserName=${HIVE_POSTGRES_USER:-hive}
         -Djavax.jdo.option.ConnectionPassword=${HIVE_POSTGRES_PASSWORD:-hive123}
-        -Dmetastore.warehouse.dir=hdfs://namenode:8020/lakehouse
+        -Dmetastore.warehouse.dir=s3a://lakehouse/
     depends_on:
       - postgres-metastore
-      - nodemanager
+      - minio #nodemanager
     ports:
       - "9083:9083"
     restart: always
+
   #Jupyter Notebook Service
   jupyter-spark:
     image: quay.io/jupyter/pyspark-notebook:x86_64-spark-3.5.3
@@ -147,6 +159,7 @@ services:
       - "spark-query:/home/jovyan"
     ports:
       - "8888:8888"
+
   # Milvus and MinIO
   etcd:
     container_name: milvus-etcd
@@ -169,13 +182,13 @@ services:
     container_name: milvus-minio
     image: minio/minio:RELEASE.2024-12-18T13-15-44Z
     environment:
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-admin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-admin12345}
     ports:
       - "9001:9001"
       - "9000:9000"
     volumes:
-      - milvus-minio-volume:/minio_data
+      - minio-data:/minio_data
     command: minio server /minio_data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
@@ -206,8 +219,8 @@ services:
       - "9091:9091"
     depends_on:
       - "etcd"
-      - "minio"
-  
+      - "minio" #nodemanager
+
   attu:
     container_name: milvus-attu
     image: zilliz/attu:latest
@@ -224,7 +237,7 @@ volumes:
   spark-query:
   postgres-metastore-volume:
   milvus-etcd-volume:
-  milvus-minio-volume:
+  minio-data:
   milvus-standalone-volume:
     
 networks:
