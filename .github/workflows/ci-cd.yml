@@ -1,0 +1,39 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  # pull_request:
+  #   branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+
+      - name: Setup Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Start Lakehouse
+        run: |
+          cd lakehouse
+          chmod +x ./start.sh
+          ./start.sh
+
+      - name: Start Orchestrator
+        run: |
+          cd prefect
+          chmod +x ./start.sh
+          ./start.sh

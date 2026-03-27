@@ -1,47 +1,56 @@
-version: "2"
+x-spark-common: &spark-common
+  build: ./config/spark
+  env_file:
+    - .env
+  environment: &spark-env
+    AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:-admin}
+    AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY:-admin12345}
+    AWS_REGION: us-east-1
+    AWS_DEFAULT_REGION: us-east-1
+  volumes:
+    - ./config/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    - spark-logs:/opt/spark/spark-events
+
 services:
   # Hadoop Services
-  namenode:
-    image: apache/hadoop:3.4
-    hostname: namenode
-    command: ["hdfs", "namenode"]
-    ports:
-      - 9870:9870
-    env_file:
-      - config/hadoop/hadoop-defaults.conf
-    environment:
-      ENSURE_NAMENODE_DIR: "/tmp/hadoop-hadoop/dfs/name"
-  datanode:
-    image: apache/hadoop:3.4
-    command: ["hdfs", "datanode"]
-    env_file:
-      - config/hadoop/hadoop-defaults.conf
-  resourcemanager:
-    image: apache/hadoop:3.4
-    hostname: resourcemanager
-    command: ["yarn", "resourcemanager"]
-    ports:
-        - 8088:8088
-    env_file:
-      - config/hadoop/hadoop-defaults.conf
-    volumes:
-      - ./test/hadoop/test.sh:/opt/test.sh
-  nodemanager:
-    image: apache/hadoop:3.4
-    command: ["yarn", "nodemanager"]
-    env_file:
-      - config/hadoop/hadoop-defaults.conf
+  # namenode:
+  #   image: apache/hadoop:3.4
+  #   hostname: namenode
+  #   command: ["hdfs", "namenode"]
+  #   ports:
+  #     - 9870:9870
+  #   env_file:
+  #     - config/hadoop/hadoop-defaults.conf
+  #   environment:
+  #     ENSURE_NAMENODE_DIR: "/tmp/hadoop-hadoop/dfs/name"
+  # datanode:
+  #   image: apache/hadoop:3.4
+  #   command: ["hdfs", "datanode"]
+  #   env_file:
+  #     - config/hadoop/hadoop-defaults.conf
+  # resourcemanager:
+  #   image: apache/hadoop:3.4
+  #   hostname: resourcemanager
+  #   command: ["yarn", "resourcemanager"]
+  #   ports:
+  #       - 8088:8088
+  #   env_file:
+  #     - config/hadoop/hadoop-defaults.conf
+  #   volumes:
+  #     - ./test/hadoop/test.sh:/opt/test.sh
+  # nodemanager:
+  #   image: apache/hadoop:3.4
+  #   command: ["yarn", "nodemanager"]
+  #   env_file:
+  #     - config/hadoop/hadoop-defaults.conf
+
   # Spark Services
-  spark-common: &spark-common
-    build: ./config/spark
-    volumes:
-      - ./config/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
-      - spark-logs:/opt/spark/spark-events
   spark-master:
     <<: *spark-common
     environment:
-      - SPARK_MODE=master
-      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      <<: *spark-env
+      SPARK_MODE: master
+      SPARK_RPC_AUTHENTICATION_ENABLED: no
     command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master"]
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080" ]
@@ -56,8 +65,9 @@ services:
     <<: *spark-common
     command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.history.HistoryServer"]
     environment:
-      - SPARK_MODE=history
-      - SPARK_HISTORY_OPTS=-Dspark.history.fs.logDirectory=/opt/spark/spark-events
+      <<: *spark-env
+      SPARK_MODE: history
+      SPARK_HISTORY_OPTS: -Dspark.history.fs.logDirectory=/opt/spark/spark-events
     ports:
       - "18080:18080"
     depends_on:
@@ -67,15 +77,17 @@ services:
     <<: *spark-common
     command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077"]
     environment:
-      - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_WEBUI_PORT=8082
-      - SPARK_WORKER_MEMORY=4g
-      - SPARK_DAEMON_MEMORY=1g
+      <<: *spark-env
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_WORKER_WEBUI_PORT: 8082
+      SPARK_WORKER_MEMORY: 4g
+      SPARK_DAEMON_MEMORY: 1g
     depends_on:
       - spark-master
     ports:
       - "8082:8082"
+
   # Trino Service
   trino:
     image: trinodb/trino:463   # JDK17
@@ -92,7 +104,7 @@ services:
       - trino-data:/data/trino:rw
       # - ./config/trino/hadoop:/etc/hadoop/conf:ro
     depends_on:
-      - nodemanager
+      - minio
       - metastore
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
@@ -100,6 +112,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
   # Hive Metastore Service
   postgres-metastore:
     image: postgres:13
@@ -128,23 +141,128 @@ services:
       METASTORE_DB_TYPE: postgres
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-admin}
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-admin12345}
-      SERVICE_OPTS: >-
+      SERVICE_OPTS: >- #-Dmetastore.warehouse.dir=hdfs://namenode:8020/lakehouse
         -Xmx1G
         -Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver
         -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://postgres-metastore:5432/${HIVE_POSTGRES_DB:-metastore_db}
         -Djavax.jdo.option.ConnectionUserName=${HIVE_POSTGRES_USER:-hive}
         -Djavax.jdo.option.ConnectionPassword=${HIVE_POSTGRES_PASSWORD:-hive123}
-        -Dmetastore.warehouse.dir=hdfs://namenode:8020/lakehouse
+        -Dmetastore.warehouse.dir=s3a://lakehouse/
     depends_on:
       - postgres-metastore
-      - nodemanager
+      - minio #nodemanager
     ports:
       - "9083:9083"
     restart: always
+
+  #Jupyter Notebook Service
+  jupyter-spark:
+    image: quay.io/jupyter/pyspark-notebook:x86_64-spark-3.5.3
+    volumes:
+      - "spark-query:/home/jovyan"
+    ports:
+      - "8888:8888"
+
+  # Milvus and MinIO
+  etcd:
+    container_name: milvus-etcd
+    image: quay.io/coreos/etcd:v3.5.25
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - milvus-etcd-volume:/etcd
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  minio:
+    container_name: milvus-minio
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-admin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-admin12345}
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    volumes:
+      - minio-data:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+  
+  mc:
+    image: minio/mc:latest
+    env_file:
+      - .env
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-admin} ${MINIO_ROOT_PASSWORD:-admin12345};
+
+      /usr/bin/mc mb --ignore-existing myminio/warehouse;
+      /usr/bin/mc mb --ignore-existing myminio/iceberg;
+      /usr/bin/mc mb --ignore-existing myminio/lakehouse;
+
+      exit 0;
+      "
+
+  standalone:
+    container_name: milvus-standalone
+    image: milvusdb/milvus:v2.6.11
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+    - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MQ_TYPE: woodpecker
+    volumes:
+      - milvus-standalone-volume:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    depends_on:
+      - "etcd"
+      - "minio" #nodemanager
+
+  attu:
+    container_name: milvus-attu
+    image: zilliz/attu:latest
+    ports:
+      - "8000:3000"
+    environment:
+      MILVUS_URL: milvus-standalone:19530
+    depends_on:
+      - standalone
+
 volumes:
   spark-logs:
   trino-data:
+  spark-query:
   postgres-metastore-volume:
+  milvus-etcd-volume:
+  minio-data:
+  milvus-standalone-volume:
     
-
+networks:
+  default:
+    external: false
+    name: ecosystem_network_test
   

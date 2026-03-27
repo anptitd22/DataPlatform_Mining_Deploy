@@ -1,40 +1,34 @@
-# Test Command Spark Hadoop 
+# Test Command Spark MinIO
 
-- Step1: Kiểm tra spark
-```bash
-docker exec -it lakehouse-spark-master-1 /opt/spark/bin/spark-submit \
-  --master spark://spark-master:7077 \
-  --conf spark.eventLog.enabled=true \
-  --conf spark.eventLog.dir=/opt/spark/spark-events \
-  --class org.apache.spark.examples.SparkPi \
-  /opt/spark/examples/jars/spark-examples_2.12-3.5.8.jar 10
-```
+docker exec -it spark-master /opt/spark/bin/pyspark \
+  --master spark://spark-master:7077
 
-- Step2: Kết nối vào pyspark
-```bash
-docker exec -it lakehouse-spark-master-1 /opt/spark/bin/pyspark --master spark://spark-master:7077
-```
-
-- Step3: Chạy test đọc ghi trên hadoop
-```python
-data = [("Hadoop_Test", 100), ("Spark_Test", 200), ("Connection_Ok", 300)]
+# Tạo data test
+data = [("MinIO_Test", 100), ("Spark_S3_Connection", 200), ("All_Systems_Go", 300)]
 df = spark.createDataFrame(data, ["Name", "Value"])
-df.write.mode("overwrite").csv("hdfs://namenode:8020/tmp/test_connection")
-check_df = spark.read.csv("hdfs://namenode:8020/tmp/test_connection")
+
+# Ghi trực tiếp vào bucket 'lakehouse' trên MinIO
+df.write.mode("overwrite").parquet("s3a://lakehouse/test_connection")
+
+# Đọc lại để kiểm tra
+check_df = spark.read.parquet("s3a://lakehouse/test_connection")
 check_df.show()
-```
 
-- Step4: Chạy test iceberg
-```python
-spark.sql("CREATE DATABASE IF NOT EXISTS hadoop_prod.db_test")
-spark.sql("CREATE TABLE hadoop_prod.db_test.table_iceberg (id bigint, data string) USING iceberg")
-spark.sql("INSERT INTO hadoop_prod.db_test.table_iceberg VALUES (1, 'Iceberg_Test_Ok')")
-spark.table("hadoop_prod.db_test.table_iceberg").show()
-```
+# Tạo database thông qua Catalog 'metastore'
+spark.sql("CREATE DATABASE IF NOT EXISTS metastore.db_test")
 
-- Step5: Cài dbeaver, kết nối và chạy test tạo bảng
-```sql
-create schema gold
-create table iceberg.gold.test (testcol int)
-insert into iceberg.gold.test (1)
-```
+# Tạo bảng Iceberg
+spark.sql("CREATE TABLE metastore.db_test.iceberg_minio (id bigint, data string) USING iceberg")
+
+# Insert dữ liệu
+spark.sql("INSERT INTO metastore.db_test.iceberg_minio VALUES (1, 'Iceberg_MinIO_HMS_Success')")
+
+# Truy vấn kiểm tra
+spark.table("metastore.db_test.iceberg_minio").show()
+
+-- Kiểm tra bảng đã tạo từ PySpark
+SELECT * FROM metastore.db_test.iceberg_minio;
+
+-- Tạo bảng mới từ DBeaver
+CREATE TABLE metastore.db_test.dbeaver_test (id int, note string) USING iceberg;
+INSERT INTO metastore.db_test.dbeaver_test VALUES (100, 'Created from DBeaver');
