@@ -55,7 +55,7 @@ services:
     ports:
       - "8082:8082"
   
-  nginx:
+  spark-nginx:
     image: nginx:alpine
     container_name: spark-nginx
     ports:
