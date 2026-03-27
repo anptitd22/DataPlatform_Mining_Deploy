@@ -1,0 +1,73 @@
+x-spark-common: &spark-common
+  build: ./config/spark
+  env_file:
+    - .env
+  environment: &spark-env
+    AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:-admin}
+    AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY:-admin12345}
+    AWS_REGION: us-east-1
+    AWS_DEFAULT_REGION: us-east-1
+  volumes:
+    - ./config/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    - spark-logs:/opt/spark/spark-events
+
+services:
+  spark-master:
+    <<: *spark-common
+    environment:
+      <<: *spark-env
+      SPARK_MODE: master
+      SPARK_RPC_AUTHENTICATION_ENABLED: no
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master"]
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080" ]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    ports:
+      - "7077:7077"     
+      - "9090:8080"
+  
+  spark-history-server:
+    <<: *spark-common
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.history.HistoryServer"]
+    environment:
+      <<: *spark-env
+      SPARK_MODE: history
+      SPARK_HISTORY_OPTS: -Dspark.history.fs.logDirectory=/opt/spark/spark-events
+    ports:
+      - "18080:18080"
+    depends_on:
+      - spark-master
+
+  spark-worker:
+    <<: *spark-common
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077"]
+    environment:
+      <<: *spark-env
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_WORKER_WEBUI_PORT: 8082
+      SPARK_WORKER_MEMORY: 4g
+      SPARK_DAEMON_MEMORY: 1g
+    depends_on:
+      - spark-master
+    ports:
+      - "8082:8082"
+  
+  nginx:
+    image: nginx:alpine
+    container_name: spark-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # - ssl
+    networks:
+      - lakehouse_network_test
+    restart: always
+
+volumes:
+  spark-logs:
+  spark-query:

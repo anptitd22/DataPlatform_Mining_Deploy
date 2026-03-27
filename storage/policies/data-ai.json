@@ -1,0 +1,18 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowTeamAIFullAccessToBuckets",
+            "Effect": "Allow",
+            "Action": ["s3:*"],
+            "Resource": [
+                "arn:aws:s3:::wiki",
+                "arn:aws:s3:::wiki/*",
+                "arn:aws:s3:::warehouse",
+                "arn:aws:s3:::warehouse/*",
+                "arn:aws:s3:::milvus",
+                "arn:aws:s3:::milvus/*"
+            ]
+        }
+    ]
+}
