@@ -28,6 +28,8 @@ x-minio-common: &minio-common
       # MINIO_LOGGER_WEBHOOK_AUTH_TOKEN: TOKEN
       # MINIO_LOGGER_WEBHOOK_CLIENT_CERT: /opt/minio/webhook/public.crt
       # MINIO_LOGGER_WEBHOOK_CLIENT_KEY: /opt/minio/webhook/private.key
+      MINIO_BROWSER_REDIRECT_URL: https://${DOMAIN}
+      MINIO_SERVER_URL: https://${DOMAIN}
 
     command: server http://minio-{1...3}/mnt/drive{1...4} --console-address ":9001"
     healthcheck:
@@ -84,7 +86,7 @@ services:
       - ./policies:/policies
     entrypoint: >
       /bin/sh -c "
-      /usr/bin/mc alias set myminio http://minio-nginx:9000 ${MINIO_ROOT_USER:-admin} ${MINIO_ROOT_PASSWORD:-admin12345};
+      /usr/bin/mc alias set myminio http://minio-1:9000 ${MINIO_ROOT_USER:-admin} ${MINIO_ROOT_PASSWORD:-admin12345};
 
       /usr/bin/mc mb --ignore-existing myminio/warehouse;
       /usr/bin/mc mb --ignore-existing myminio/iceberg;
@@ -97,7 +99,7 @@ services:
       /usr/bin/mc admin policy create myminio airflow-p /policies/airflow.json || true;
       /usr/bin/mc admin policy attach myminio airflow-p --user airflow;
 
-      /usr/bin/mc admin user add myminio data-ai ${data-ai_MINIO_PASSWORD:-ai123098} || true;
+      /usr/bin/mc admin user add myminio data-ai ${data_ai_MINIO_PASSWORD:-ai123098} || true;
       /usr/bin/mc admin policy create myminio data-ai-p /policies/data-ai.json || true;
       /usr/bin/mc admin policy attach myminio data-ai-p --user data-ai;
 
@@ -159,7 +161,7 @@ services:
     environment:
       SERVICE_NAME: metastore
       DB_DRIVER: postgres
-      DB_URL: jdbc:postgresql://postgres-metastore:5432/${HIVE_POSTGRES_DB:-metastore_db}
+      DB_URL: jdbc:postgresql://postgres-metastore-1:5432/${HIVE_POSTGRES_DB:-metastore_db}
       DB_USER: ${HIVE_POSTGRES_USER:-hive}
       DB_PASS: ${HIVE_POSTGRES_PASSWORD:-hive123}
       METASTORE_DB_TYPE: postgres
