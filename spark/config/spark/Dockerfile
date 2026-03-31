@@ -28,9 +28,15 @@ ADD https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/${ICEBE
 
 RUN chmod 644 /opt/spark/jars/*.jar
 
-RUN mkdir -p /opt/spark/spark-events && chmod 777 /opt/spark/spark-events
+RUN mkdir -p /home/spark/.cache && \
+    chmod -R 777 /home/spark && \
+    mkdir -p /opt/spark/spark-events && \
+    chmod 777 /opt/spark/spark-events
 
-RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
+ENV HF_HOME=/home/spark/.cache
+ENV XDG_CACHE_HOME=/home/spark/.cache
+
+RUN pip install torch sentence-transformers && \
     pip install Pillow pymilvus
 
 USER spark
