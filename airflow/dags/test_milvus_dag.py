@@ -1,26 +1,18 @@
 from airflow import DAG
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
-from datetime import datetime, timedelta
-
-default_args = {
-    "owner": "an_data_eng",
-    "start_date": datetime(2026, 3, 29),
-    "retries": 1,
-    "retry_delay": timedelta(minutes=5),
-}
+from datetime import datetime
 
 with DAG(
-    "image_to_vector_iceberg_pipeline",
-    default_args=default_args,
-    schedule="@daily",
+    "milvus_test_paper_pipeline",
+    start_date=datetime(2026, 3, 31),
+    schedule=None,
     catchup=False,
-    tags=["lakehouse", "iceberg", "milvus"],
 ) as dag:
-    process_images_to_vector = SparkSubmitOperator(
-        task_id="process_images_to_vector",
+    test_milvus = SparkSubmitOperator(
+        task_id="test_milvus_insert",
         conn_id="spark_default",
         packages="org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.6.1,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.367",
-        application="/opt/airflow/src/image_to_vector.py",
+        application="/opt/airflow/src/test_milvus_logic.py",
         conf={
             "spark.sql.catalog.metastore.io-impl": "org.apache.iceberg.hadoop.HadoopFileIO",
             "spark.sql.catalog.metastore": "org.apache.iceberg.spark.SparkCatalog",

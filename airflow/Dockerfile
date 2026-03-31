@@ -23,7 +23,7 @@ ENV PATH="/home/airflow/.local/bin:${PATH}"
 
 RUN uv pip install pyspark==3.5.5
 
-RUN uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
+RUN uv pip install torch sentence-transformers && \
     uv pip install Pillow
 
 COPY requirements.txt /requirements.txt
