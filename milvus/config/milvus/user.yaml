@@ -1,0 +1,10 @@
+minio:
+  address: minio-nginx
+  port: 9000
+  accessKeyID: admin
+  secretAccessKey: admin12345
+  bucketName: milvus
+  rootPath: files
+  useSSL: false
+  useIAM: false
+  cloudProvider: aws

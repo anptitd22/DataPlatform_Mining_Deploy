@@ -30,6 +30,9 @@ RUN chmod 644 /opt/spark/jars/*.jar
 
 RUN mkdir -p /opt/spark/spark-events && chmod 777 /opt/spark/spark-events
 
+RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
+    pip install Pillow pymilvus
+
 USER spark
 
 WORKDIR /opt/spark

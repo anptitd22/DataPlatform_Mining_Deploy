@@ -88,10 +88,11 @@ x-airflow-common:
     AIRFLOW__CORE__XCOM_OBJECTSTORAGE_PATH: 's3://minio_xcom_conn@airflow/airflow-xcom'
     AIRFLOW__CORE__XCOM_OBJECTSTORAGE_THRESHOLD: 0 # always save in s3
   volumes:
-    - ${AIRFLOW_PROJ_DIR:-.}/sql:/opt/airflow/sql
+    # - ${AIRFLOW_PROJ_DIR:-.}/sql:/opt/airflow/sql
     # - ${AIRFLOW_PROJ_DIR:-.}/dataset:/opt/airflow/dataset
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/config/airflow.cfg:/opt/airflow/config/airflow.cfg:ro
+    - ${AIRFLOW_PROJ_DIR:-.}/src:/opt/airflow/src
     # - ${AIRFLOW_PROJ_DIR:-.}/config/webserver_config.py:/opt/airflow/webserver_config.py:ro
     - airflow-logs-volume:/opt/airflow/logs
     - airflow-plugins-volume:/opt/airflow/plugins

@@ -1,5 +1,8 @@
 apache-airflow[trino,common-sql,amazon,telegram,fab]==3.0.0
 trino==0.333.0
+apache-airflow-providers-apache-spark==5.2.1
+protobuf==4.25.6
+pymilvus>=2.4.3
 sqlalchemy-trino==0.5.0
 pyarrow==16.1.0
 pydantic<=2.12.0

@@ -24,10 +24,10 @@ services:
     - seccomp:unconfined
     environment:
       ETCD_ENDPOINTS: etcd:2379
-      MINIO_ADDRESS: minio:9000
-      MQ_TYPE: woodpecker
+      # MILVUS_CONFIG_FILE: /milvus/configs/milvus.yaml
     volumes:
       - milvus-standalone-volume:/var/lib/milvus
+      - ./config/milvus/user.yaml:/milvus/configs/user.yaml
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
       interval: 30s
@@ -39,7 +39,6 @@ services:
       - "9091:9091"
     depends_on:
       - "etcd"
-      - "minio" #nodemanager
 
   attu:
     container_name: milvus-attu
@@ -50,6 +49,11 @@ services:
       MILVUS_URL: milvus-standalone:19530
     depends_on:
       - standalone
+
+networks:
+  default:  
+    external: false
+    name: lakehouse_network_test
 
 volumes:
   milvus-etcd-volume:
