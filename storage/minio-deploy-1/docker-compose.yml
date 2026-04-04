@@ -35,6 +35,7 @@ x-minio-common: &minio-common
     extra_hosts:
       - "minio-1:${MINIO_1_IP:-10.0.0.6}"
       - "minio-2:${MINIO_2_IP:-10.0.0.7}"
+      - "minio-3:${MINIO_3_IP:-10.0.0.8}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s

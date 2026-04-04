@@ -27,7 +27,8 @@ services:
       # MILVUS_CONFIG_FILE: /milvus/configs/milvus.yaml
     volumes:
       - milvus-standalone-volume:/var/lib/milvus
-      - ./config/milvus/user.yaml:/milvus/configs/user.yaml
+      # - ./config/milvus/user.yaml:/milvus/configs/user.yaml
+      - ./config/milvus/milvus.yaml:/milvus/configs/milvus.yaml:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
       interval: 30s
