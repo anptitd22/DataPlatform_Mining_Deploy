@@ -31,7 +31,7 @@ x-minio-common: &minio-common
       # MINIO_BROWSER_REDIRECT_URL: https://${DOMAIN}
       # MINIO_SERVER_URL: https://${DOMAIN}
 
-    command: server http://minio-{1...2}:9000/mnt/drive{1...4} --console-address ":9001"
+    command: server http://minio-{1...3}:9000/mnt/drive{1...4} --console-address ":9001"
     extra_hosts:
       - "minio-1:${MINIO_1_IP:-10.0.0.6}"
       - "minio-2:${MINIO_2_IP:-10.0.0.7}"
