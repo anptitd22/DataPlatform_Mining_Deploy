@@ -1,0 +1,3 @@
+CREATE DATABASE metastore_db;
+CREATE USER hive WITH PASSWORD 'hive123';
+GRANT ALL PRIVILEGES ON DATABASE metastore_db TO hive;

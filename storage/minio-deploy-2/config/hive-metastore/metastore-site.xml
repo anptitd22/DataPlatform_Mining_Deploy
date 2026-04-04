@@ -1,0 +1,49 @@
+<configuration>
+    <property>
+        <name>metastore.warehouse.dir</name>
+    </property>
+    <property>
+        <name>javax.jdo.option.ConnectionURL</name>
+    </property>
+        <property>
+        <name>javax.jdo.option.ConnectionUserName</name>
+    </property>
+    <property>
+        <name>javax.jdo.option.ConnectionPassword</name>
+    </property>
+    <property>
+        <name>fs.s3a.endpoint</name>
+        <value>http://minio-nginx:9000</value>
+    </property>
+    <property>
+        <name>fs.s3a.path.style.access</name>
+        <value>true</value>
+    </property>
+
+    <property>
+        <name>metastore.thrift.uris</name>
+        <description>Thrift URI for the remote metastore. Used by metastore client to connect to remote metastore.</description>
+        <value>thrift://0.0.0.0:9083</value>
+    </property>
+    <property>
+        <name>metastore.task.threads.always</name>
+        <value>org.apache.hadoop.hive.metastore.events.EventCleanerTask,org.apache.hadoop.hive.metastore.MaterializationsCacheCleanerTask</value>
+    </property>
+    <property>
+        <name>metastore.expression.proxy</name>
+        <value>org.apache.hadoop.hive.metastore.DefaultPartitionExpressionProxy</value>
+    </property>
+    <property>
+        <name>javax.jdo.option.ConnectionDriverName</name>
+        <value>org.postgresql.Driver</value>
+    </property>
+    <property>
+        <name>hive.input.format</name>
+        <value>io.delta.hive.HiveInputFormat</value>
+    </property>
+    <property>
+        <name>hive.tez.input.format</name>
+        <value>io.delta.hive.HiveInputFormat</value>
+    </property>
+
+</configuration>

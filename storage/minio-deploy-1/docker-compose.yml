@@ -1,0 +1,192 @@
+x-minio-common: &minio-common
+    image: quay.io/minio/minio:RELEASE.2025-07-23T15-54-02Z
+    env_file:
+      - .env
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-admin12345}
+      MINIO_DISTRIBUTED_MODE_ENABLED: yes
+      # MINIO_DISTRIBUTED_NODES: minio-{1...3}
+      # MINIO_AUDIT_KAFKA_ENABLE: on
+      # MINIO_AUDIT_KAFKA_BROKERS: kafka-1:19092,kafka-2:19092
+      # MINIO_AUDIT_KAFKA_TOPIC: aistor
+      # MINIO_AUDIT_WEBHOOK_ENABLE: on
+      # MINIO_AUDIT_WEBHOOK_ENDPOINT: http://eventlog:3636/events/minio/audit
+      # MINIO_AUDIT_WEBHOOK_BATCH_SIZE: 2
+      # MINIO_AUDIT_WEBHOOK_MAX_RETRY: 5
+      # MINIO_AUDIT_WEBHOOK_RETRY_INTERVAL: 10s
+      # MINIO_AUDIT_WEBHOOK_HTTP_TIMEOUT: 10s
+      # MINIO_AUDIT_WEBHOOK_HTTP_ENCODING: json
+      # MINIO_AUDIT_WEBHOOK_AUTH_TOKEN: TOKEN
+      # MINIO_LOGGER_WEBHOOK_ENABLE: on
+      # MINIO_LOGGER_WEBHOOK_ENDPOINT: http://eventlog:3636/events/minio/server
+      # MINIO_LOGGER_WEBHOOK_BATCH_SIZE: 2
+      # MINIO_LOGGER_WEBHOOK_MAX_RETRY: 5
+      # MINIO_LOGGER_WEBHOOK_RETRY_INTERVAL: 1s
+      # MINIO_LOGGER_WEBHOOK_HTTP_TIMEOUT: 10s
+      # MINIO_LOGGER_WEBHOOK_HTTP_ENCODING: json
+      # MINIO_LOGGER_WEBHOOK_AUTH_TOKEN: TOKEN
+      # MINIO_LOGGER_WEBHOOK_CLIENT_CERT: /opt/minio/webhook/public.crt
+      # MINIO_LOGGER_WEBHOOK_CLIENT_KEY: /opt/minio/webhook/private.key
+      # MINIO_BROWSER_REDIRECT_URL: https://${DOMAIN}
+      # MINIO_SERVER_URL: https://${DOMAIN}
+
+    command: server http://minio-{1...2}:9000/mnt/drive{1...4} --console-address ":9001"
+    extra_hosts:
+      - "minio-1:${MINIO_1_IP:-10.0.0.6}"
+      - "minio-2:${MINIO_2_IP:-10.0.0.7}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+services:
+  minio-1:
+    <<: *minio-common
+    hostname: minio-1
+    container_name: minio-1
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-1-disk1-data:/mnt/drive1
+      - minio-1-disk2-data:/mnt/drive2
+      - minio-1-disk3-data:/mnt/drive3
+      - minio-1-disk4-data:/mnt/drive4
+
+  mc:
+    image: minio/mc:latest
+    env_file:
+      - .env
+    depends_on:
+      minio-1:
+        condition: service_healthy
+      minio-nginx:
+        condition: service_healthy
+    volumes:
+      - ./policies:/policies
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio-1:9000 ${MINIO_ROOT_USER:-admin} ${MINIO_ROOT_PASSWORD:-admin12345};
+
+      /usr/bin/mc mb --ignore-existing myminio/warehouse;
+      /usr/bin/mc mb --ignore-existing myminio/iceberg;
+      /usr/bin/mc mb --ignore-existing myminio/lakehouse;
+      /usr/bin/mc mb --ignore-existing myminio/airflow;
+      /usr/bin/mc mb --ignore-existing myminio/wiki;
+      /usr/bin/mc mb --ignore-existing myminio/milvus;
+
+      /usr/bin/mc admin user add myminio airflow ${AIRFLOW_MINIO_PASSWORD:-airflow123098} || true;
+      /usr/bin/mc admin policy create myminio airflow-p /policies/airflow.json || true;
+      /usr/bin/mc admin policy attach myminio airflow-p --user airflow;
+
+      /usr/bin/mc admin user add myminio data-ai ${data_ai_MINIO_PASSWORD:-ai123098} || true;
+      /usr/bin/mc admin policy create myminio data-ai-p /policies/data-ai.json || true;
+      /usr/bin/mc admin policy attach myminio data-ai-p --user data-ai;
+
+      /usr/bin/mc admin user add myminio trino ${TRINO_MINIO_PASSWORD:-trino123098} || true;
+      /usr/bin/mc admin policy create myminio trino-p /policies/trino.json || true;
+      /usr/bin/mc admin policy attach myminio trino-p --user trino;
+
+      /usr/bin/mc admin user add myminio user ${TRINO_MINIO_PASSWORD:-user12345} || true;
+      /usr/bin/mc admin policy create myminio user-p /policies/user.json || true;
+      /usr/bin/mc admin policy attach myminio user-p --user user;
+
+      exit 0;
+      "
+  
+  postgres-metastore-1:
+    image: postgres:13
+    container_name: postgres-metastore-1
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${HIVE_POSTGRES_DB:-metastore_db}
+      POSTGRES_USER: ${HIVE_POSTGRES_USER:-hive}
+      POSTGRES_PASSWORD: ${HIVE_POSTGRES_PASSWORD:-hive123}
+    volumes:
+      - postgres-metastore-1:/var/lib/postgresql/data
+      - ./config/postgres-1/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./config/postgres-1/postgresql.conf:/usr/share/postgresql/postgresql.conf:ro
+      - ./config/postgres-1/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: ["postgres", "-c", "config_file=/usr/share/postgresql/postgresql.conf"]
+    expose:
+      - "5432"            
+    restart: always
+  
+  postgres-metastore-2:
+    image: postgres:13
+    container_name: postgres-metastore-2
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${HIVE_POSTGRES_DB:-metastore_db}
+      POSTGRES_USER: ${HIVE_POSTGRES_USER:-hive}
+      POSTGRES_PASSWORD: ${HIVE_POSTGRES_PASSWORD:-hive123}
+    volumes:
+      - postgres-metastore-2:/var/lib/postgresql/data
+      - ./config/postgres-2/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./config/postgres-2/postgresql.conf:/usr/share/postgresql/postgresql.conf:ro
+    command: ["postgres", "-c", "config_file=/usr/share/postgresql/postgresql.conf"]
+    expose:
+      - "5432"            
+    restart: always
+
+  metastore:
+    build: 
+      context: ./config/hive-metastore
+    hostname: metastore
+    container_name: metastore
+    env_file:
+      - .env
+    environment:
+      SERVICE_NAME: metastore
+      DB_DRIVER: postgres
+      DB_URL: jdbc:postgresql://postgres-metastore-1:5432/${HIVE_POSTGRES_DB:-metastore_db}
+      DB_USER: ${HIVE_POSTGRES_USER:-hive}
+      DB_PASS: ${HIVE_POSTGRES_PASSWORD:-hive123}
+      METASTORE_DB_TYPE: postgres
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-admin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-admin12345}
+      SERVICE_OPTS: >-
+        -Xmx1G
+        -Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver
+        -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://postgres-metastore-1:5432/${HIVE_POSTGRES_DB:-metastore_db}
+        -Djavax.jdo.option.ConnectionUserName=${HIVE_POSTGRES_USER:-hive}
+        -Djavax.jdo.option.ConnectionPassword=${HIVE_POSTGRES_PASSWORD:-hive123}
+        -Dmetastore.warehouse.dir=s3a://lakehouse/
+    depends_on:
+      - postgres-metastore-1
+      - postgres-metastore-2
+      - minio-1
+    ports:
+      - "9083:9083"    # Hive Metastore Thrift
+    restart: always
+  
+  minio-nginx:
+    image: nginx:alpine
+    container_name: minio-nginx
+    ports:
+      - "9001:9001"    # MinIO Console
+      - "9000:9000"    # MinIO S3 API
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # - ssl
+    depends_on:
+      - minio-1
+      - metastore
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres-metastore-1:
+  postgres-metastore-2:
+  minio-1-disk1-data:
+  minio-1-disk2-data:
+  minio-1-disk3-data:
+  minio-1-disk4-data:

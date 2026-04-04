@@ -1,0 +1,27 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowTrinoToListBuckets",
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetBucketLocation",
+                "s3:ListAllMyBuckets"
+            ],
+            "Resource": ["arn:aws:s3:::*"]
+        },
+        {
+            "Sid": "AllowTrinoFullAccessToBuckets",
+            "Effect": "Allow",
+            "Action": ["s3:*"],
+            "Resource": [
+                "arn:aws:s3:::lakehouse",
+                "arn:aws:s3:::lakehouse/*",
+                "arn:aws:s3:::warehouse",
+                "arn:aws:s3:::warehouse/*",
+                "arn:aws:s3:::iceberg",
+                "arn:aws:s3:::iceberg/*"
+            ]
+        }
+    ]
+}
